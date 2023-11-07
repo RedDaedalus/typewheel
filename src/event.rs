@@ -1,7 +1,7 @@
 use crate::Component;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "action", content = "value", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ClickEvent {
@@ -36,7 +36,7 @@ impl ClickEvent {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "action", content = "contents", rename_all = "snake_case")]
 pub enum HoverEvent {
     ShowText(Box<Component>),

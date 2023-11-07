@@ -1,7 +1,7 @@
 use crate::event::{ClickEvent, HoverEvent};
 use serde::{Deserialize, Serialize};
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct Style {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bold: Option<bool>,
@@ -26,12 +26,18 @@ pub struct Style {
     pub hover_event: Option<HoverEvent>,
 }
 
+impl Style {
+    pub fn clear(&mut self) {
+        std::mem::swap(self, &mut Self::default())
+    }
+}
+
 /// Models a text component's color. There are 16 named colors, and any hex color can be created via
 /// the [TextColor::Hex] variant.
 ///
 /// Other crates that provide color-like types should implement [`Into<TextColor>`](Into), as
 /// Typewheel will accept any type that can be converted in its APIs.
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum TextColor {
     /// Named color `black` (hex `#000`; code `§0`).
