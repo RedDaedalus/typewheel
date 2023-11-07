@@ -181,9 +181,6 @@ impl Component {
 			/// assert_eq!(component.style.bold, Some(true));
 			build: with_bold,
 
-			/// Clears this component's `bold` property.
-			///
-			/// # Examples
 			/// ```
 			/// # use typewheel::Component;
 			/// let mut component = Component::text("hello world")
