@@ -28,13 +28,22 @@
 #![cfg_attr(ci, deny(missing_docs))]
 #![cfg_attr(not(ci), warn(missing_docs))]
 
+mod codec;
 mod event;
+mod iter;
 mod style;
 
+#[cfg(feature = "json")]
+pub use self::codec::json::JsonComponentCodec;
 pub use self::{
+	codec::PlainTextComponentCodec,
 	event::{ClickEvent, HoverEvent},
+	iter::IterOrder,
 	style::{Style, TextColor},
 };
+use std::collections::VecDeque;
+
+use crate::iter::ComponentIterator;
 use serde::{Deserialize, Serialize};
 use std::mem;
 
@@ -572,10 +581,18 @@ impl Component {
 		target
 	}
 
+	pub fn iter(&self, order: IterOrder) -> impl Iterator<Item = &Component> {
+		ComponentIterator {
+			queue: VecDeque::from([self]),
+			order,
+		}
+	}
+
 	// Getters
 
-	/// Gets the string contents of this component. If its body is not [ComponentBody::Text], this
-	/// method will return [None].
+	/// Gets the string contents of this component, excluding that of its children. If its body is
+	/// not [ComponentBody::Text], this method will return [None]. To get the full contents of a
+	/// component, use the [plain text codec][PlainTextComponentCodec].
 	///
 	/// # Examples
 	/// ```
@@ -583,7 +600,7 @@ impl Component {
 	/// assert_eq!(Component::text("!").content(), Some("!"));
 	/// assert_eq!(Component::keybind("jump").content(), None);
 	/// ```
-	pub fn content(&self) -> Option<&str> {
+	pub fn shallow_content(&self) -> Option<&str> {
 		match self.body {
 			ComponentBody::Text(ref text) => Some(text),
 			_ => None,
