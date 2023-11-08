@@ -13,6 +13,7 @@ pub(crate) struct ComponentIterator<'a> {
 ///
 /// # Examples
 /// ```rust,no_run
+/// # // Proper unit tests for iterators are in crate-level integration tests.
 /// # use typewheel::Component;
 /// #
 /// let component = Component::text("a").with_extra(["b", "c"]);
@@ -107,68 +108,5 @@ impl<'a> Iterator for ComponentIterator<'a> {
 		} else {
 			None
 		}
-	}
-}
-
-#[cfg(test)]
-mod tests {
-	use super::{ComponentIterator, IterOrder};
-	use crate::Component;
-	use std::collections::VecDeque;
-
-	/*
-	a
-	|- b
-	|  |- c, d
-	|- e
-	   |- f
-		  |- g, h
-	 */
-
-	fn test_component() -> Component {
-		Component::text("a").with_extra([
-			Component::text("b").with_extra(["c", "d"]),
-			Component::text("e").with_extra([Component::text("f").with_extra(["g", "h"])]),
-		])
-	}
-
-	#[test]
-	fn depth_first_iter() {
-		let component = test_component();
-
-		let mut iter = ComponentIterator {
-			queue: VecDeque::from([&component]),
-			order: IterOrder::DepthFirst,
-		};
-
-		assert_eq!(iter.next().and_then(Component::shallow_content), Some("a"));
-		assert_eq!(iter.next().and_then(Component::shallow_content), Some("b"));
-		assert_eq!(iter.next().and_then(Component::shallow_content), Some("c"));
-		assert_eq!(iter.next().and_then(Component::shallow_content), Some("d"));
-		assert_eq!(iter.next().and_then(Component::shallow_content), Some("e"));
-		assert_eq!(iter.next().and_then(Component::shallow_content), Some("f"));
-		assert_eq!(iter.next().and_then(Component::shallow_content), Some("g"));
-		assert_eq!(iter.next().and_then(Component::shallow_content), Some("h"));
-
-		assert!(iter.next().is_none());
-	}
-
-	#[test]
-	fn breadth_first_iter() {
-		let component = test_component();
-
-		let mut iter = ComponentIterator {
-			queue: VecDeque::from([&component]),
-			order: IterOrder::BreadthFirst,
-		};
-
-		assert_eq!(iter.next().and_then(Component::shallow_content), Some("a"));
-		assert_eq!(iter.next().and_then(Component::shallow_content), Some("b"));
-		assert_eq!(iter.next().and_then(Component::shallow_content), Some("e"));
-		assert_eq!(iter.next().and_then(Component::shallow_content), Some("c"));
-		assert_eq!(iter.next().and_then(Component::shallow_content), Some("d"));
-		assert_eq!(iter.next().and_then(Component::shallow_content), Some("f"));
-		assert_eq!(iter.next().and_then(Component::shallow_content), Some("g"));
-		assert_eq!(iter.next().and_then(Component::shallow_content), Some("h"));
 	}
 }

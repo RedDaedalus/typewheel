@@ -72,6 +72,55 @@ impl Style {
 	pub fn clear(&mut self) {
 		mem::swap(self, &mut Self::default())
 	}
+
+	/// Merges two styles together, with the style parameter taking precedence over `self`. This is
+	/// designed to mimic the way styles are inherited when rendering a component; a node's effective
+	/// style is the result of merging the styles of all of its parent components and its own.
+	///
+	/// # Examples
+	/// ```
+	/// # use typewheel::Style;
+	/// #
+	/// let mut style = Style {
+	///     bold: Some(true),
+	///     underlined: Some(true),
+	///     ..Default::default()
+	/// };
+	///
+	/// style.merge(&Style {
+	///     bold: Some(false),
+	///     italic: Some(true),
+	///     ..Default::default()
+	/// });
+	///
+	/// assert_eq!(style.bold, Some(false));
+	/// assert_eq!(style.italic, Some(true));
+	/// assert_eq!(style.underlined, Some(true));
+	/// ```
+	pub fn merge(&mut self, other: &Self) {
+		self.bold = other.bold.or(self.bold);
+		self.italic = other.italic.or(self.italic);
+		self.underlined = other.underlined.or(self.underlined);
+		self.strikethrough = other.strikethrough.or(self.strikethrough);
+		self.obfuscated = other.obfuscated.or(self.obfuscated);
+		self.font = other.font.as_ref().or(self.font.as_ref()).cloned();
+		self.color = other.color.or(self.color);
+		self.insertion = other
+			.insertion
+			.as_ref()
+			.or(self.insertion.as_ref())
+			.cloned();
+		self.click_event = other
+			.click_event
+			.as_ref()
+			.or(self.click_event.as_ref())
+			.cloned();
+		self.hover_event = other
+			.hover_event
+			.as_ref()
+			.or(self.hover_event.as_ref())
+			.cloned();
+	}
 }
 
 /// Models a text component's color. There are 16 named colors, and any hex color can be created via
@@ -79,7 +128,11 @@ impl Style {
 ///
 /// Other crates that provide color-like types should implement [`Into<TextColor>`](Into), as
 /// Typewheel will accept any type that can be converted in its APIs.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+///
+/// # Serial Representation
+/// Named text colors are serialized in `snake_case`. Each variant documents its own string
+/// representation for clarity. Hex colors are serialized as hex strings with a leading `#`.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum TextColor {
 	/// Named color `black` (hex `#000`; code `§0`).
@@ -161,24 +214,5 @@ mod hex_serde {
 		}
 
 		u32::from_str_radix(&hex_string[1..], 16).map_err(|_| D::Error::custom(ERROR_MESSAGE))
-	}
-
-	#[cfg(test)]
-	mod tests {
-		use crate::TextColor;
-		use serde_test::{assert_tokens, Token};
-
-		#[test]
-		fn color_codec() {
-			assert_tokens(
-				&TextColor::LightPurple,
-				&[Token::UnitVariant {
-					name: "TextColor",
-					variant: "light_purple",
-				}],
-			);
-
-			assert_tokens(&TextColor::Hex(0xAABBCC), &[Token::String("#AABBCC")])
-		}
 	}
 }

@@ -16,7 +16,7 @@
 //! }
 //! ```
 
-use crate::{Component, IterOrder, Style};
+use crate::{Component, IterOrder};
 use std::convert::Infallible;
 
 /// A trait for encoding and decoding components to arbitrary formats.
