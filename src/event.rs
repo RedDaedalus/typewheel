@@ -79,7 +79,29 @@ pub enum HoverEvent {
 	/// Displays another component in chat when hovered.
 	#[non_exhaustive]
 	ShowText(Box<Component>),
-	// TODO: item & entity
+
+	// TODO: Proper sNBT serialization
+	/// Displays an item in chat when hovered. The inner string is an sNBT tag containing 3 fields:
+	/// * `id`: The item's material as a namespaced key (i.e `minecraft:stone`).
+	/// * `count`: The number of items in the item stack.
+	/// * `tag`: Additional NBT properties such as display name and enchantments.
+	#[non_exhaustive]
+	ShowItem(String),
+
+	/// Displays an entity in chat when hovered. The inner string is an sNBT tag containing 3 fields:
+	/// * `id`: The entity's String UUID.
+	/// * `name`: The entity's name.
+	/// * `type` (optional): The entity's type as a namespaced key (i.e `minecraft:creeper`).
+	#[non_exhaustive]
+	ShowEntity(String),
+}
+
+/// Used for the [HoverEvent] Serde model as a default for the item count.
+#[doc(hidden)]
+#[inline(always)]
+#[allow(unused)] // unused when `experimental_hover_events` is unused
+fn one() -> i32 {
+	1
 }
 
 impl HoverEvent {
@@ -87,6 +109,30 @@ impl HoverEvent {
 	#[inline]
 	pub fn show_text(text: impl Into<Component>) -> Self {
 		Self::ShowText(Box::new(text.into()))
+	}
+}
+
+#[cfg(feature = "experimental_hover_events")]
+impl HoverEvent {
+	/// Creates a [HoverEvent] that displays an item when hovered. See [HoverEvent::ShowItem] for
+	/// more details.
+	///
+	/// # Experimental
+	/// This method is experimental and *will* change. It exists to provide support if needed, but
+	/// the API for creating item meta will be improved at a later date.
+	#[inline]
+	pub fn show_item(item_meta: impl Into<String>) -> Self {
+		Self::ShowItem(item_meta.into())
+	}
+	/// Creates a [HoverEvent] that displays an entity when hovered. See [HoverEvent::ShowEntity]
+	/// for more details.
+	///
+	/// # Experimental
+	/// This method is experimental and *will* change. It exists to provide support if needed, but
+	/// the API for creating entity meta will be improved at a later date.
+	#[inline]
+	pub fn show_entity(entity_meta: impl Into<String>) -> Self {
+		Self::ShowEntity(entity_meta.into())
 	}
 }
 

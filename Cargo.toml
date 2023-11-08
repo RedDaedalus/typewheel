@@ -11,6 +11,7 @@ serde_json = { version = "1.0.108", optional = true }
 
 [features]
 default = ["json"]
+experimental_hover_events = []
 json = ["dep:serde_json"]
 
 [dev-dependencies]

@@ -1,30 +1,4 @@
-//! Typewheel is a library for creating and serializing [text components][wiki].
-//!
-//! [Component]s can be modified using both setters and the builder pattern, where each field has a
-//! method for setting its value directly, and for producing a new [Component] with the new value.
-//!
-//! # Creating Components
-//! ```
-//! # use typewheel::{Component, TextColor};
-//! #
-//! // Setter pattern: setters pass back a reference for chaining.
-//! let mut inner = Component::text("world");
-//! inner.bold(true).color(0xAA7FFF);
-//!
-//! assert_eq!(inner.style.bold, Some(true));
-//! assert_eq!(inner.style.color, Some(TextColor::Hex(0xAA7FFF)));
-//!
-//! // Builder pattern: builders accept ownership of `self` and return an owned value back.
-//! let component = Component::text("Hello, ")
-//!     .with_color(TextColor::Gray)
-//!     .with_extra([inner, "!".into()]);
-//!
-//! assert_eq!(component.style.color, Some(TextColor::Gray));
-//! assert!(!component.extra.is_empty());
-//! ```
-//!
-//! [wiki]: https://wiki.vg/Chat
-
+#![doc = include_str!("../README.md")]
 #![cfg_attr(ci, deny(missing_docs))]
 #![cfg_attr(not(ci), warn(missing_docs))]
 
@@ -48,13 +22,19 @@ use std::mem;
 /// components are written to the output depth-first.
 ///
 /// # Component Types
-/// There are several basic component types: text, translation, and keybind. Text components contain
-/// a raw string which is rendered for their contents. Translation components contains a resource
-/// key that is used to display a localized message to any recipients. Keybind components also hold
-/// a resource key which is used to display the key a player has bound for a specific action.
+/// | type                                | description                                                   |
+/// | ----------------------------------- | ------------------------------------------------------------- |
+/// | [Text][Component::text()]           | The simplest component type -- contains a raw string of text. |
+/// | [Translate][Component::translate()] | Displays a piece of text in the client's language.            |
+/// | [Keybind][Component::keybind()]     | Displays the bound button for a client action.                |
+/// | [Score][Component::score()]         | Displays a scoreboard score.                                 |
+/// For more information on each component type, visit the factory function documentation linked in
+/// the table above.
 ///
-/// TODO: other component types
-/// -- why aren't these implemented? -> they require some sort of rendering system
+/// ## Unsupported Types
+/// The `selector` and `nbt` component types are both unsupported. This is because they cannot be
+/// rendered by the client, and have to instead be replaced with [text][ComponentBody::Text]
+/// components.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Component {
@@ -135,35 +115,63 @@ impl Component {
 	pub fn text(text: impl Into<String>) -> Self {
 		Self {
 			style: Style::default(),
-			extra: Vec::new(),
 			body: ComponentBody::Text(text.into()),
+			extra: Vec::new(),
 		}
 	}
 
 	/// Creates a new translation component. Translation components contain a key which is used to
 	/// look up the string to template into, and an array of components that are interpolated into
 	/// the key's argument slots.
+	///
+	/// A list of translation keys can be found in the lang files of the Vanilla resource pack.
 	pub fn translate(
 		key: impl Into<String>,
 		with: impl IntoIterator<Item = impl Into<Component>>,
 	) -> Self {
 		Self {
 			style: Style::default(),
-			extra: Vec::new(),
 			body: ComponentBody::Translation {
 				key: key.into(),
 				with: with.into_iter().map(Into::into).collect(),
 			},
+			extra: Vec::new(),
 		}
 	}
 
 	/// Creates a new keybind component. The keybind is an identifier to a button binding, and the
 	/// client will show the button the action is bound to when rendered.
+	///
+	/// A list of keybind keys can be found in the client's `options.txt` file in the `.minecraft`
+	/// directory.
 	pub fn keybind(key: impl Into<String>) -> Self {
 		Self {
 			style: Style::default(),
-			extra: Vec::new(),
 			body: ComponentBody::Keybind(key.into()),
+			extra: Vec::new(),
+		}
+	}
+
+	/// Creates a new score component. The name field is a player name or UUID, the objective is an
+	/// arbitrary scoreboard objective name, and the value is the resolved value from the server.
+	///
+	/// In the Vanilla server, when deserializing a component, the score value is automatically
+	/// populated. In this library, it has to be set at creation time. If it is desired to populate
+	/// scores automatically, an iterator can be used to find all score components and fill them in.
+	/// To accomplish this, mutate the [ComponentBody::Score] `value` field.
+	pub fn score(
+		name: impl Into<String>,
+		objective: impl Into<String>,
+		value: impl Into<String>,
+	) -> Self {
+		Self {
+			style: Style::default(),
+			body: ComponentBody::Score {
+				name: name.into(),
+				objective: objective.into(),
+				value: value.into(),
+			},
+			extra: Vec::new(),
 		}
 	}
 	// </editor-fold>
@@ -590,13 +598,13 @@ impl Component {
 
 	/// Gets the string contents of this component, excluding that of its children. If its body is
 	/// not [ComponentBody::Text], this method will return [None]. To get the full contents of a
-	/// component, use the [plain text codec][PlainTextComponentCodec].
+	/// component, use the [plain text codec][codec::PlainTextComponentCodec].
 	///
 	/// # Examples
 	/// ```
 	/// use typewheel::Component;
 	/// assert_eq!(Component::text("!").shallow_content(), Some("!"));
-	/// assert_eq!(Component::keybind("jump").shallow_content(), None);
+	/// assert_eq!(Component::keybind("key.jump").shallow_content(), None);
 	/// ```
 	pub fn shallow_content(&self) -> Option<&str> {
 		match self.body {
@@ -627,6 +635,26 @@ pub enum ComponentBody {
 	/// # Usage
 	/// To create a new keybind component, use [Component::keybind(key)].
 	Keybind(String),
+
+	/// Represents a scoreboard score component. When sent to the client, the value of the score is
+	/// displayed.
+	///
+	/// # Usage
+	/// To create a new score component, use [Component::score(name, objective, value)].
+	Score {
+		/// The entry name -- either a player name or a UUID.
+		name: String,
+
+		/// The objective the score is coming from. This is not rendered in the client, but is used
+		/// for resolving the score value.
+		objective: String,
+
+		/// The resolved score value. This must be sent to the client in order for it to be
+		/// displayed properly. When a score is deserialized without a value, it is set to an empty
+		/// string.
+		#[serde(default)]
+		value: String,
+	},
 
 	/// A translation component body. Translation components have a translation key, and an array of
 	/// items that are interpolated into the translated message. Expected parameters vary based on
