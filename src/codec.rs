@@ -16,7 +16,7 @@
 //! }
 //! ```
 
-use crate::{Component, IterOrder};
+use crate::{Component, IterOrder, Style};
 use std::convert::Infallible;
 
 /// A trait for encoding and decoding components to arbitrary formats.
@@ -140,32 +140,5 @@ impl ComponentCodec for PlainTextComponentCodec {
 	#[inline(always)]
 	fn deserialize(self, value: impl Into<Self::Input>) -> Result<Component, Self::Error> {
 		Ok(Component::text(value.into()))
-	}
-}
-
-#[cfg(__not_ready)]
-mod legacy {
-	#[derive(Clone, Copy)]
-	pub struct LegacyComponentCodec(pub char);
-
-	impl LegacyComponentCodec {
-		pub const AMPERSAND: LegacyComponentCodec = LegacyComponentCodec('&');
-		pub const SECTION: LegacyComponentCodec = LegacyComponentCodec('§');
-	}
-
-	impl ComponentCodec for LegacyComponentCodec {
-		type Input = String;
-		type Output = String;
-		type Error = Infallible; // todo
-
-		fn serialize(self, component: &Component) -> Result<Self::Output, Self::Error> {
-			let mut output = String::new();
-
-			Ok(output)
-		}
-
-		fn deserialize(self, value: impl Into<Self::Input>) -> Result<Component, Self::Error> {
-			todo!()
-		}
 	}
 }
