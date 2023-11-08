@@ -28,15 +28,12 @@
 #![cfg_attr(ci, deny(missing_docs))]
 #![cfg_attr(not(ci), warn(missing_docs))]
 
-mod codec;
+pub mod codec;
 mod event;
 mod iter;
 mod style;
 
-#[cfg(feature = "json")]
-pub use self::codec::json::JsonComponentCodec;
 pub use self::{
-	codec::PlainTextComponentCodec,
 	event::{ClickEvent, HoverEvent},
 	iter::IterOrder,
 	style::{Style, TextColor},
@@ -59,7 +56,6 @@ use std::mem;
 /// TODO: other component types
 /// -- why aren't these implemented? -> they require some sort of rendering system
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(from = "String")]
 #[non_exhaustive]
 pub struct Component {
 	/// This component's style. The style contains common properties to how a component is rendered,
@@ -70,10 +66,11 @@ pub struct Component {
 	/// The component's body. The body holds the actual content of this component that varies based
 	/// on its type.
 	#[serde(flatten)]
+	// NOTE: Ideally this would be before `style`, but the order matters for serde
 	pub body: ComponentBody,
 
 	/// The component's children. When being written out, components are read depth-first.
-	#[serde(skip_serializing_if = "Vec::is_empty")]
+	#[serde(skip_serializing_if = "Vec::is_empty", default)]
 	pub extra: Vec<Component>,
 }
 
@@ -521,7 +518,7 @@ impl Component {
 	///
 	/// component.append([extra.clone()]);
 	///
-	/// assert_eq!(component.extra.first(), Some(extra));
+	/// assert_eq!(component.extra.first(), Some(&extra));
 	/// ```
 	pub fn append(&mut self, extra: impl IntoIterator<Item = impl Into<Component>>) {
 		self.extra.extend(extra.into_iter().map(Into::into))
@@ -541,7 +538,7 @@ impl Component {
 	///     .with_color(TextColor::Gray)
 	///     .with_extra([extra.clone()]);
 	///
-	/// assert_eq!(component.extra.first(), Some(extra));
+	/// assert_eq!(component.extra.first(), Some(&extra));
 	/// ```
 	#[must_use]
 	pub fn with_extra(mut self, extra: impl IntoIterator<Item = impl Into<Component>>) -> Self {
@@ -572,8 +569,8 @@ impl Component {
 	/// let mut component = Component::text("hello ")
 	///    .with_extra(["world"]);
 	///
-	/// let removed = component.clear_extra();
-	/// assert_eq!(removed.first(), Some(Component::text("world")));
+	/// let removed = component.take_extra();
+	/// assert_eq!(removed.first(), Some(&Component::text("world")));
 	/// ```
 	pub fn take_extra(&mut self) -> Vec<Self> {
 		let mut target = Vec::new();
@@ -581,6 +578,7 @@ impl Component {
 		target
 	}
 
+	/// Creates an iterator of [component references][Component].
 	pub fn iter(&self, order: IterOrder) -> impl Iterator<Item = &Component> {
 		ComponentIterator {
 			queue: VecDeque::from([self]),
@@ -597,8 +595,8 @@ impl Component {
 	/// # Examples
 	/// ```
 	/// use typewheel::Component;
-	/// assert_eq!(Component::text("!").content(), Some("!"));
-	/// assert_eq!(Component::keybind("jump").content(), None);
+	/// assert_eq!(Component::text("!").shallow_content(), Some("!"));
+	/// assert_eq!(Component::keybind("jump").shallow_content(), None);
 	/// ```
 	pub fn shallow_content(&self) -> Option<&str> {
 		match self.body {
@@ -658,25 +656,5 @@ impl From<String> for Component {
 impl From<&str> for Component {
 	fn from(value: &str) -> Self {
 		Self::text(value.to_string())
-	}
-}
-
-// TODO: proper tests
-#[cfg(test)]
-mod tests {
-	use super::{Component, TextColor};
-
-	#[test]
-	fn serial() {
-		let test = Component::text("Daedalus")
-			.with_bold(true)
-			.with_color(0xff0049)
-			.with_hover_event(Component::text("Player ID 427").with_color(TextColor::Gray))
-			.with_extra([
-				Component::text(" has joined for the first time.").with_color(TextColor::Gray)
-			])
-			.with_extra(Some("h"));
-
-		println!("{}", serde_json::to_string_pretty(&test).unwrap());
 	}
 }
