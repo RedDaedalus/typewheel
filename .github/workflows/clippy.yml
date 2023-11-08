@@ -2,7 +2,7 @@ on: push
 name: Clippy check
 
 env:
-  RUSTFLAGS: "-Dwarnings"
+  RUSTFLAGS: "-Dwarnings --cfg ci"
 
 jobs:
   clippy_check:
