@@ -9,11 +9,15 @@ mod event;
 mod iter;
 mod style;
 
+#[doc(hidden)]
+pub use self::iter::ComponentIterator;
 pub use self::{
 	event::{ClickEvent, HoverEvent},
-	iter::{ComponentIterator, IterOrder},
+	iter::IterOrder,
 	style::{Style, TextColor},
 };
+
+use std::fmt::{Display, Formatter};
 
 use serde::{Deserialize, Serialize};
 use std::mem;
@@ -22,7 +26,7 @@ use std::mem;
 /// components are written to the output depth-first.
 ///
 /// # Component Types
-/// | type                                | description                                                   |
+/// | Type                                | Description                                                   |
 /// | ----------------------------------- | ------------------------------------------------------------- |
 /// | [Text][Component::text()]           | The simplest component type -- contains a raw string of text. |
 /// | [Translate][Component::translate()] | Displays a piece of text in the client's language.            |
@@ -71,6 +75,15 @@ impl Component {
 	/// the key's argument slots.
 	///
 	/// A list of translation keys can be found in the lang files of the Vanilla resource pack.
+	///
+	/// # Usage
+	/// The `with` parameter accepts any type that implements [IntoIterator] with any item that
+	/// can implements [`Into<Component>`][Into]. When creating a component without any translation
+	/// arguments, you can use the following syntax:
+	/// ```no_run
+	/// # use typewheel::Component;
+	/// let component = Component::translate("key", None::<Component>.into_iter());
+	/// ```
 	pub fn translate(
 		key: impl Into<String>,
 		with: impl IntoIterator<Item = impl Into<Component>>,
@@ -212,10 +225,22 @@ impl Component {
 	/// assert_eq!(Component::keybind("key.jump").shallow_content(), None);
 	/// ```
 	pub fn shallow_content(&self) -> Option<&str> {
-		match self.body {
-			ComponentBody::Text(ref text) => Some(text),
+		match &self.body {
+			ComponentBody::Text(text) => Some(text),
 			_ => None,
 		}
+	}
+}
+
+impl From<String> for Component {
+	fn from(value: String) -> Self {
+		Self::text(value)
+	}
+}
+
+impl From<&str> for Component {
+	fn from(value: &str) -> Self {
+		Self::text(value.to_string())
 	}
 }
 
@@ -280,14 +305,21 @@ pub enum ComponentBody {
 	},
 }
 
-impl From<String> for Component {
-	fn from(value: String) -> Self {
-		Self::text(value)
-	}
-}
+impl Display for ComponentBody {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Text(contents) => write!(f, "{contents}")?,
+			Self::Keybind(key) => write!(f, "[{key}]")?,
+			Self::Score { value, .. } => write!(f, "{value}")?,
+			Self::Translation { key, with: args } => {
+				write!(f, "<{key}")?;
+				for arg in args {
+					write!(f, ":{}", arg.body)?;
+				}
+				write!(f, ">")?;
+			}
+		}
 
-impl From<&str> for Component {
-	fn from(value: &str) -> Self {
-		Self::text(value.to_string())
+		Ok(())
 	}
 }

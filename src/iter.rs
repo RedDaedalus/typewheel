@@ -114,7 +114,20 @@ impl<'a> Iterator for ComponentIterator<'a> {
 }
 
 impl Component {
-	/// Creates an iterator of [component references][Component].
+	/// Creates an iterator of [component references][Component]. Components are traversed in the
+	/// provided order.
+	///
+	/// # Usage
+	/// Normally, iterating over components can be done with a for-in loop. This uses the default
+	/// [IterOrder::DepthFirst] ordering:
+	/// ```rust,no_run
+	/// # use typewheel::Component;
+	/// #
+	/// let component = Component::text("a").with_extra(["b", "c"]);
+	/// for node in &component {
+	///     println!("{component:?}");
+	/// }
+	/// ```
 	pub fn iter(&self, order: IterOrder) -> impl Iterator<Item = &Self> {
 		ComponentIterator {
 			queue: VecDeque::from([self]),

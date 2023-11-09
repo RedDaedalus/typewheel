@@ -69,6 +69,21 @@ macro_rules! style_fields {
 		}
 
 		impl $name {
+			/// Checks if this style is blank, or in other words, that all of its fields are [None].
+			///
+			/// # Examples
+			/// ```
+			/// # use typewheel::Style;
+			/// assert!(Style::default().is_blank());
+			/// assert!(!Style {
+			///     bold: Some(true),
+			///     ..Default::default()
+			/// }.is_blank());
+			/// ```
+			pub const fn is_blank(&self) -> bool {
+				$(self.$field.is_none() )&&+
+			}
+
 			/// Merges two styles together, with the style parameter taking precedence over `self`. This is
 			/// designed to mimic the way styles are inherited when rendering a component; a node's effective
 			/// style is the result of merging the styles of all of its parent components and its own.
@@ -104,6 +119,10 @@ macro_rules! style_fields {
 
 		impl std::fmt::Debug for $name {
 			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+				if self.is_blank() {
+					return f.write_str("Style{<blank>}");
+				}
+
 				let mut readout = f.debug_struct(stringify!($name));
 
 				$(

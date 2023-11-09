@@ -16,8 +16,10 @@
 //! }
 //! ```
 
-use crate::{Component, IterOrder};
-use std::convert::Infallible;
+use crate::Component;
+
+#[cfg(doc)]
+use crate::ComponentBody;
 
 /// A trait for encoding and decoding components to arbitrary formats.
 ///
@@ -31,21 +33,21 @@ pub trait ComponentCodec {
 	///be taken into account when choosing an input type.
 	type Input;
 
-	/// The output type for serialization. This is generally the same or similar to [Self::Input].
-	type Output;
+	/// The output type for serialization. If this codec is fallible, this should be a [Result]
+	/// type.
+	type EncodeOutput;
+	/// The output type for deserialization. This should be one of [Component],
+	/// [`Result<Component, _>`][Result], or [`Option<Component>`][Option].
+	type DecodeOutput;
 
-	/// The error type covering failed de/serialization. This should be [Infallible] if the codec
-	/// cannot error.
-	type Error;
-
-	/// Serializes a component, returning its encoded representation as [Self::Output].
-	fn serialize(self, component: &Component) -> Result<Self::Output, Self::Error>;
+	/// Serializes a component, returning its encoded representation as [Self::EncodeOutput].
+	fn serialize(self, component: &Component) -> Self::EncodeOutput;
 
 	/// Deserializes a component from an arbitrary [input representation][Self::Input].
-	fn deserialize(self, value: impl Into<Self::Input>) -> Result<Component, Self::Error>;
+	fn deserialize(self, value: impl Into<Self::Input>) -> Self::DecodeOutput;
 }
 
-#[cfg(feature = "json")]
+#[cfg(any(feature = "json", doc))]
 mod json {
 	use super::ComponentCodec;
 	use crate::Component;
@@ -67,7 +69,10 @@ mod json {
 	///             .with_bold(true)
 	///     ]);
 	///
-	/// const JSON: &str = r#"{"color":"blue","text":"hello ","extra":[{"bold":true,"color":"green","text":"world"}]}"#;
+	/// # // Not a raw string so we can use a line break
+	/// const JSON: &str = "{\"color\":\"blue\",\"text\":\"hello \",\"extra\":[\
+	/// {\"bold\":true,\"color\":\"green\",\"text\":\"world\"}\
+	/// ]}";
 	///
 	/// let codec = JsonComponentCodec;
 	/// assert_eq!(codec.serialize(&component).unwrap(), JSON);
@@ -78,16 +83,16 @@ mod json {
 
 	impl ComponentCodec for JsonComponentCodec {
 		type Input = String;
-		type Output = String;
-		type Error = serde_json::Error;
+		type EncodeOutput = Result<String, serde_json::Error>;
+		type DecodeOutput = Result<Component, serde_json::Error>;
 
 		#[inline(always)]
-		fn serialize(self, component: &Component) -> Result<Self::Output, Self::Error> {
+		fn serialize(self, component: &Component) -> Self::EncodeOutput {
 			serde_json::to_string(component)
 		}
 
 		#[inline]
-		fn deserialize<'a>(self, value: impl Into<Self::Input>) -> Result<Component, Self::Error> {
+		fn deserialize<'a>(self, value: impl Into<Self::Input>) -> Self::DecodeOutput {
 			serde_json::from_str(&value.into())
 		}
 	}
@@ -98,8 +103,13 @@ pub use json::JsonComponentCodec;
 
 /// A component codec for encoding components as plain text without any formatting.
 ///
-/// Components that are not [text components][crate::ComponentBody::Text] will not be included in
-/// serialization output. When deserializing a component, the output is [Component::text()].
+/// Components that are not [text components][ComponentBody::Text] will be encoded with a
+/// best-effort approach:
+/// * [ComponentBody::Keybind] components are encoded as `[{key}]`.
+/// * [ComponentBody::Translation] components are encoded as `<{key}:{...args}>`.
+/// * [ComponentBody::Score] components are encoded as their value.
+///
+/// These representations are **one-way**. [ComponentCodec::deserialize()] will only ever emit text.
 ///
 /// # Examples
 /// ```
@@ -112,33 +122,31 @@ pub use json::JsonComponentCodec;
 ///
 /// let codec = PlainTextComponentCodec;
 /// // Serializing a component
-/// assert_eq!(codec.serialize(&component).unwrap(), "hello world");
+/// assert_eq!(codec.serialize(&component), "hello world");
 ///
 /// // Deserializing a component
-/// assert_eq!(codec.deserialize("hello world").unwrap(), Component::text("hello world"));
+/// assert_eq!(codec.deserialize("hello world"), Component::text("hello world"));
 /// ```
 #[derive(Clone, Copy)] // Clone has no meaning here but Copy does
 pub struct PlainTextComponentCodec;
 
 impl ComponentCodec for PlainTextComponentCodec {
 	type Input = String;
-	type Output = String;
-	type Error = Infallible;
+	type EncodeOutput = String;
+	type DecodeOutput = Component;
 
-	fn serialize(self, component: &Component) -> Result<Self::Output, Self::Error> {
+	fn serialize(self, component: &Component) -> Self::EncodeOutput {
 		let mut output = String::new();
 
-		for node in component.iter(IterOrder::DepthFirst) {
-			if let Some(content) = node.shallow_content() {
-				output += content;
-			}
+		for node in component {
+			output += &node.body.to_string();
 		}
 
-		Ok(output)
+		output
 	}
 
 	#[inline(always)]
-	fn deserialize(self, value: impl Into<Self::Input>) -> Result<Component, Self::Error> {
-		Ok(Component::text(value.into()))
+	fn deserialize(self, value: impl Into<Self::Input>) -> Self::DecodeOutput {
+		Component::text(value.into())
 	}
 }
