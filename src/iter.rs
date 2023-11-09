@@ -1,11 +1,6 @@
 use crate::Component;
 use std::collections::VecDeque;
 
-pub(crate) struct ComponentIterator<'a> {
-	pub queue: VecDeque<&'a Component>,
-	pub order: IterOrder,
-}
-
 /// Determines the order over which a component iterator runs through child components.
 ///
 /// Most use cases will want [depth-first ordering][IterOrder::DepthFirst], so that is the
@@ -22,7 +17,6 @@ pub(crate) struct ComponentIterator<'a> {
 ///     println!("{}", child.shallow_content().unwrap_or(""));
 /// }
 /// ```
-///
 #[derive(Default)]
 #[non_exhaustive]
 pub enum IterOrder {
@@ -85,6 +79,14 @@ pub enum IterOrder {
 	BreadthFirst,
 }
 
+/// An internal iterator type. Eventually, this will not be exposed to the public API at all, and
+/// should not be used directly. (waiting on `impl_trait_in_assoc_type` to actually implement this)
+#[doc(hidden)]
+pub struct ComponentIterator<'a> {
+	queue: VecDeque<&'a Component>,
+	order: IterOrder,
+}
+
 impl<'a> Iterator for ComponentIterator<'a> {
 	type Item = &'a Component;
 
@@ -107,6 +109,28 @@ impl<'a> Iterator for ComponentIterator<'a> {
 			Some(item)
 		} else {
 			None
+		}
+	}
+}
+
+impl Component {
+	/// Creates an iterator of [component references][Component].
+	pub fn iter(&self, order: IterOrder) -> impl Iterator<Item = &Self> {
+		ComponentIterator {
+			queue: VecDeque::from([self]),
+			order,
+		}
+	}
+}
+
+impl<'a> IntoIterator for &'a Component {
+	type Item = Self;
+	type IntoIter = ComponentIterator<'a>; // TODO: impl Iterator<Item = Self::Item>
+
+	fn into_iter(self) -> Self::IntoIter {
+		ComponentIterator {
+			queue: VecDeque::from([self]),
+			order: IterOrder::default(),
 		}
 	}
 }

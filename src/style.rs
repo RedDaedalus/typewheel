@@ -2,80 +2,539 @@ use crate::event::{ClickEvent, HoverEvent};
 use serde::{Deserialize, Serialize};
 use std::mem;
 
-/// Represents a component's style. The style contains all aspects of a component that define how it
-/// is rendered and are not part of its content. Every component type supports every style property.
+/// This is quite a hefty macro, so let's break down what it does:
 ///
-/// Every field in this struct is optional. If a field is set to [None], its value is inherited from
-/// its parent.
-#[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq, Eq)]
-pub struct Style {
+/// This macro is responsible for generating the [Style] struct, its fields, and accessors to its
+/// values in [crate::Component]. This exists because there is a ton of repeated skeleton for each
+/// style field that can be generated automatically. While the details may be a bit obscured, the
+/// actual implementation becomes easier to read.
+///
+/// The first part of the macro accepts a general struct definition:
+/// ```no_run
+/// /// ... docs/attributes
+/// pub struct Name;
+/// ```
+/// This is the skeleton that receives all of the fields and methods. It uses this definition when
+/// generating a proper struct.
+///
+/// > Note that some attributes are applied by default -- notably [Serialize], [Deserialize], and a
+///few other traits are automatically derived.
+///
+/// The rest of the body of this macro is field definitions. Fields are defined like so:
+///```not_rust
+/// name<T> {
+///    set: <setter_name>,
+///    build: <builder_name>,
+///    clear: <clearer_name>
+///}
+///```
+/// Note that the actual type of the field is `Option<T>`, not `T`.
+///
+/// The `set`, `build`, and `clear` fields define the names for their respective methods that are
+/// implemented on [crate::Component]:
+/// * `<setter_name>(&mut self, state: impl Into<T>) -> &mut Self`
+/// * `<builder_name>(mut self, state: impl Into<T>) -> Self`
+/// * `<clearer_name>(&mut self) -> &mut Self`
+///  
+/// Each of these fields should have accompanying docs, but there is a doc skeleton that is attached
+/// to each method as well containing generic information. The provided docs should only have tests
+/// and any extra information that is not added by default.
+#[doc(hidden)]
+macro_rules! style_fields {
+	(
+		$(#[$struct_meta: meta])*
+		$vis: vis struct $name: ident;
+
+		$(
+			$(#[$field_meta: meta])*
+			$field: ident < $ty: ty > {
+				$(#[$set_meta: meta])*
+				set: $setter: ident,
+				$(#[$build_meta: meta])*
+				build: $builder: ident,
+				$(#[$clear_meta: meta])*
+				clear: $clearer: ident
+			}
+		),+ $(,)?
+	) => {
+		$(#[$struct_meta])*
+		// "intrinsic" traits -- expected to exist by this macro.
+		#[derive(serde::Serialize, serde::Deserialize, Default, Clone)]
+		$vis struct $name {
+			$(
+				#[serde(skip_serializing_if = "Option::is_none")]
+				$(#[$field_meta])*
+				$vis $field: Option<$ty>
+			),+
+		}
+
+		impl $name {
+			/// Merges two styles together, with the style parameter taking precedence over `self`. This is
+			/// designed to mimic the way styles are inherited when rendering a component; a node's effective
+			/// style is the result of merging the styles of all of its parent components and its own.
+			///
+			/// # Examples
+			/// ```
+			/// # use typewheel::Style;
+			/// #
+			/// let mut style = Style {
+			///     bold: Some(true),
+			///     underlined: Some(true),
+			///     ..Default::default()
+			/// };
+			///
+			/// style.merge(&Style {
+			///     bold: Some(false),
+			///     italic: Some(true),
+			///     ..Default::default()
+			/// });
+			///
+			/// assert_eq!(style.bold, Some(false));
+			/// assert_eq!(style.italic, Some(true));
+			/// assert_eq!(style.underlined, Some(true));
+			///
+			pub fn merge(&mut self, src: &Self) {
+				$(
+					if let Some(v) = &src.$field {
+						self.$field = Some(v.clone());
+					}
+				)+
+			}
+		}
+
+		impl std::fmt::Debug for $name {
+			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+				let mut readout = f.debug_struct(stringify!($name));
+
+				$(
+					if let Some(v) = &self.$field {
+						readout.field(stringify!($field), v);
+					}
+				)+
+
+				readout.finish()
+    		}
+		}
+
+		impl crate::Component {
+			$(
+				#[doc = concat!(
+					"Sets this component's `", stringify!($field), "` property to the provided value."
+				)]
+				/// This setter can be chained with other setter calls, as it returns a mutable
+				/// reference to `self`.
+				///
+				/// # Examples
+				$(#[$set_meta])*
+				pub fn $setter(&mut self, state: impl Into<$ty>) -> &mut Self {
+					self.style.$field = Some(state.into());
+					self
+				}
+
+				#[doc = concat!(
+					"A builder method for setting this component's `", stringify!($field), "` property.",
+					" This method assumes ownership of `self`, and passes it back when it returns."
+				)]
+				///
+				/// # Examples
+				///
+				$(#[$build_meta])*
+				pub fn $builder(mut self, state: impl Into<$ty>) -> Self {
+					self.$setter(state);
+					self
+				}
+
+				$(#[$clear_meta])*
+				pub fn $clearer(&mut self) -> &mut Self {
+					self.style.$field = None;
+					self
+				}
+			)+
+		}
+	};
+}
+
+style_fields! {
+	/// Represents a component's style. The style contains all aspects of a component that define
+	/// how it is rendered and are not part of its content. Every component type supports every
+	/// style property.
+	///
+	/// Every field in this struct is optional. If a field is set to [None], its value is inherited
+	/// from its parent.
+	///
+	/// # Exhaustiveness
+	/// It is important to note that, while not marked as such, this struct is **non exhaustive**.
+	/// New style fields my be added if Mojang decides to extend components at a later date. This
+	/// struct unfortunately cannot be marked as such because the struct update syntax is forbidden
+	/// on non-exhaustive structs. To respect the semver implications of this, new fields will incur
+	/// a minor version bump.
+	///
+	#[derive(PartialEq, Eq)]
+	pub struct Style;
+
 	/// Controls whether this component and its children render in bold. Defaults to `false` if
 	/// unspecified.
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub bold: Option<bool>,
+	bold<bool> {
+		/// ```
+		/// # use typewheel::Component;
+		/// let mut component = Component::text("hello world");
+		/// component.bold(true);
+		///
+		/// assert_eq!(component.style.bold, Some(true));
+		/// ```
+		set: bold,
+
+		/// ```
+		/// # use typewheel::Component;
+		/// let mut component = Component::text("hello world")
+		///     .with_bold(true);
+		///
+		/// assert_eq!(component.style.bold, Some(true));
+		build: with_bold,
+
+		/// ```
+		/// # use typewheel::Component;
+		/// let mut component = Component::text("hello world")
+		///     .with_bold(true);
+		///
+		/// assert_eq!(component.style.bold, Some(true));
+		/// component.clear_bold();
+		/// assert_eq!(component.style.bold, None);
+		clear: clear_bold
+	},
 
 	/// Controls whether this component and its children render as italic. Defaults to `false` if
 	/// unspecified.
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub italic: Option<bool>,
+	italic<bool> {
+		/// ```
+		/// # use typewheel::Component;
+		/// let mut component = Component::text("hello world");
+		/// component.italic(true);
+		///
+		/// assert_eq!(component.style.italic, Some(true));
+		/// ```
+		set: italic,
+
+		/// ```
+		/// # use typewheel::Component;
+		/// let component = Component::text("hello world")
+		///     .with_italic(true);
+		///
+		/// assert_eq!(component.style.italic, Some(true));
+		/// ```
+		build: with_italic,
+
+		/// ```
+		/// # use typewheel::Component;
+		/// let mut component = Component::text("hello world")
+		///     .with_italic(true);
+		///
+		/// assert_eq!(component.style.italic, Some(true));
+		/// component.clear_italic();
+		/// assert_eq!(component.style.italic, None);
+		/// ```
+		clear: clear_italic
+	},
 
 	/// Controls whether this component and its children are underlined. Defaults to `false` if
 	/// unspecified.
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub underlined: Option<bool>,
+	underlined<bool> {
+		/// ```
+		/// # use typewheel::Component;
+		/// let mut component = Component::text("hello world");
+		/// component.underlined(true);
+		///
+		/// assert_eq!(component.style.underlined, Some(true));
+		/// ```
+		set: underlined,
+
+		/// ```
+		/// # use typewheel::Component;
+		/// let component = Component::text("hello world")
+		///     .with_underlined(true);
+		///
+		/// assert_eq!(component.style.underlined, Some(true));
+		/// ```
+		build: with_underlined,
+
+		/// ```
+		/// # use typewheel::Component;
+		/// let mut component = Component::text("hello world")
+		///     .with_underlined(true);
+		///
+		/// assert_eq!(component.style.underlined, Some(true));
+		/// component.clear_underlined();
+		/// assert_eq!(component.style.underlined, None);
+		/// ```
+		clear: clear_underlined
+	},
 
 	/// Controls whether this component and its children render with strikethrough. Defaults to
 	/// `false` if unspecified.
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub strikethrough: Option<bool>,
+	strikethrough<bool> {
+		/// ```
+		/// # use typewheel::Component;
+		/// let mut component = Component::text("hello world");
+		/// component.strikethrough(true);
+		///
+		/// assert_eq!(component.style.strikethrough, Some(true));
+		/// ```
+			set: strikethrough,
+
+		/// ```
+		/// # use typewheel::Component;
+		/// let component = Component::text("hello world")
+		///     .with_strikethrough(true);
+		///
+		/// assert_eq!(component.style.strikethrough, Some(true));
+		/// ```
+		build: with_strikethrough,
+
+		/// ```
+		/// # use typewheel::Component;
+		/// let mut component = Component::text("hello world")
+		///     .with_strikethrough(true);
+		///
+		/// assert_eq!(component.style.strikethrough, Some(true));
+		/// component.clear_strikethrough();
+		/// assert_eq!(component.style.strikethrough, None);
+		/// ```
+		clear: clear_strikethrough
+	},
 
 	/// Controls whether this component and its children render as obfuscated. Defaults to `false`
 	/// if unspecified.
 	///
 	/// Note that obfuscated text renders as random characters to the user, but the actual contents
 	/// of the component are visible to anyone who checks their client logs.
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub obfuscated: Option<bool>,
+	obfuscated<bool> {
+		/// ```
+		/// # use typewheel::Component;
+		/// let mut component = Component::text("hello world");
+		/// component.obfuscated(true);
+		///
+		/// assert_eq!(component.style.obfuscated, Some(true));
+		/// ```
+		set: obfuscated,
+
+		/// ```
+		/// # use typewheel::Component;
+		/// let component = Component::text("hello world")
+		///     .with_obfuscated(true);
+		///
+		/// assert_eq!(component.style.obfuscated, Some(true));
+		/// ```
+		build: with_obfuscated,
+
+		/// ```
+		/// # use typewheel::Component;
+		/// let mut component = Component::text("hello world")
+		///     .with_obfuscated(true);
+		///
+		/// assert_eq!(component.style.obfuscated, Some(true));
+		/// component.clear_obfuscated();
+		/// assert_eq!(component.style.obfuscated, None);
+		/// ```
+		clear: clear_obfuscated
+	},
 
 	/// Controls the font of this component and its children. Defaults to `minecraft:default` if
 	/// unspecified.
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub font: Option<String>,
+	font<String> {
+		/// ```
+		/// # use typewheel::Component;
+		/// let mut component = Component::text("hello world");
+		/// component.font("minecraft:uniform");
+		///
+		/// assert_eq!(component.style.font, Some("minecraft:uniform".to_string()));
+		/// ```
+		set: font,
+
+		/// ```
+		/// # use typewheel::Component;
+		/// let component = Component::text("hello world")
+		///     .with_font("minecraft:uniform");
+		///
+		/// assert_eq!(component.style.font, Some("minecraft:uniform".to_string()));
+		/// ```
+		build: with_font,
+
+		/// ```
+		/// # use typewheel::Component;
+		/// let mut component = Component::text("hello world")
+		///     .with_font("minecraft:uniform");
+		///
+		/// assert_eq!(component.style.font, Some("minecraft:uniform".to_string()));
+		/// component.clear_font();
+		/// assert_eq!(component.style.font, None);
+		/// ```
+		clear: clear_font
+
+	},
 
 	/// Controls the color of this component and its children. If unspecified, the text renders as
 	/// white, although resource packs can change the base text color (note that [TextColor::White]
 	/// will always render as pure white, regardless of resource packs).
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub color: Option<TextColor>,
+	color<TextColor> {
+		/// ```
+		/// # use typewheel::{Component, TextColor};
+		/// let mut component = Component::text("hello world");
+		/// component.color(TextColor::Blue);
+		///
+		/// assert_eq!(component.style.color, Some(TextColor::Blue));
+		/// ```
+		set: color,
+
+		/// ```
+		/// # use typewheel::{Component, TextColor};
+		/// let component = Component::text("hello world")
+		///     .with_color(TextColor::Blue);
+		///
+		/// assert_eq!(component.style.color, Some(TextColor::Blue));
+		/// ```
+		build: with_color,
+
+		/// ```
+		/// # use typewheel::{Component, TextColor};
+		/// let mut component = Component::text("hello world")
+		///     .with_color(TextColor::Blue);
+		///
+		/// assert_eq!(component.style.color, Some(TextColor::Blue));
+		/// component.clear_color();
+		/// assert_eq!(component.style.color, None);
+		/// ```
+		clear: clear_color
+	},
 
 	/// Controls the insertion for this component that is inserted into chat when shift-clicked.
 	/// Defaults to [None] if unspecified.
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub insertion: Option<String>,
+	insertion<String> {
+		/// ```
+		/// # use typewheel::Component;
+		/// let mut component = Component::text("hello world");
+		/// component.insertion("insertion");
+		///
+		/// assert_eq!(component.style.insertion, Some("insertion".to_string()));
+		/// ```
+		set: insertion,
+
+		/// ```
+		/// # use typewheel::Component;
+		/// let component = Component::text("hello world")
+		///     .with_insertion("insertion");
+		///
+		/// assert_eq!(component.style.insertion, Some("insertion".to_string()));
+		/// ```
+		build: with_insertion,
+
+		/// ```
+		/// # use typewheel::Component;
+		/// let mut component = Component::text("hello world")
+		///     .with_insertion("insertion");
+		///
+		/// assert_eq!(component.style.insertion, Some("insertion".to_string()));
+		/// component.clear_insertion();
+		/// assert_eq!(component.style.insertion, None);
+		/// ```
+		clear: clear_insertion
+	},
 
 	/// Controls the action that occurs when the user clicks this component or its children. See the
 	/// docs on the [ClickEvent] enum for details on specific events. Defaults to [None] if
 	/// unspecified.
-	#[serde(skip_serializing_if = "Option::is_none", rename = "clickEvent")]
-	pub click_event: Option<ClickEvent>,
+	click_event<ClickEvent> {
+		/// ```
+		/// # use typewheel::{Component, ClickEvent};
+		/// const COMMAND: &str = "/help";
+		///
+		/// let mut component = Component::text("click me");
+		/// component.click_event(ClickEvent::run_command(COMMAND));
+		///
+		/// assert_eq!(
+		///     component.style.click_event,
+		///	 	Some(ClickEvent::run_command(COMMAND))
+		/// );
+		/// ```
+		set: click_event,
+
+		/// ```
+		/// # use typewheel::{Component, ClickEvent};
+		/// const COMMAND: &str = "/help";
+		///
+		/// let component = Component::text("click me")
+		///     .with_click_event(ClickEvent::run_command(COMMAND));
+		///
+		/// assert_eq!(
+		///     component.style.click_event,
+		///	 	Some(ClickEvent::run_command(COMMAND))
+		/// );
+		/// ```
+		build: with_click_event,
+
+		/// ```
+		/// # use typewheel::{Component, ClickEvent};
+		/// const COMMAND: &str = "/help";
+		///
+		/// let mut component = Component::text("click me")
+		///     .with_click_event(ClickEvent::run_command(COMMAND));
+		///
+		/// assert!(matches!(component.style.click_event, Some(_)));
+		/// component.clear_click_event();
+		/// assert_eq!(component.style.click_event, None);
+		/// ```
+		clear: clear_click_event
+	},
 
 	/// Controls the value that is displayed when the user hovers over this component or its
 	/// children. See the docs on the [HoverEvent] enum for details on specific events. Defaults to
 	/// [None] if unspecified.
-	#[serde(skip_serializing_if = "Option::is_none", rename = "hoverEvent")]
-	pub hover_event: Option<HoverEvent>,
+	hover_event<HoverEvent> {
+		/// ```
+		/// # use typewheel::{Component, HoverEvent};
+		/// const HOVER_TEXT: &str = "hidden message";
+		///
+		/// let mut component = Component::text("hover me");
+		/// component.hover_event(HoverEvent::show_text(HOVER_TEXT));
+		///
+		/// assert_eq!(
+		///     component.style.hover_event,
+		///	 	Some(HoverEvent::show_text(HOVER_TEXT))
+		/// );
+		/// ```
+		set: hover_event,
+
+		/// ```
+		/// # use typewheel::{Component, HoverEvent};
+		/// const HOVER_TEXT: &str = "hidden message";
+		///
+		/// let component = Component::text("hover me")
+		///     .with_hover_event(HoverEvent::show_text(HOVER_TEXT));
+		///
+		/// assert_eq!(
+		///     component.style.hover_event,
+		///	 	Some(HoverEvent::show_text(HOVER_TEXT))
+		/// );
+		/// ```
+		build: with_hover_event,
+
+		/// ```
+		/// # use typewheel::{Component, HoverEvent};
+		/// const HOVER_TEXT: &str = "hidden message";
+		///
+		/// let mut component = Component::text("hover me")
+		///     .with_hover_event(HoverEvent::show_text(HOVER_TEXT));
+		///
+		/// assert!(matches!(component.style.hover_event, Some(_)));
+		/// component.clear_hover_event();
+		/// assert_eq!(component.style.hover_event, None);
+		/// ```
+		clear: clear_hover_event
+	},
 }
 
 impl Style {
-	/// Clears this style, resetting all of its fields. If this component is the child of another,
-	/// all of its values will be inherited from its parent.
-	pub fn clear(&mut self) {
-		mem::swap(self, &mut Self::default())
-	}
-
-	/// Merges two styles together, with the style parameter taking precedence over `self`. This is
-	/// designed to mimic the way styles are inherited when rendering a component; a node's effective
-	/// style is the result of merging the styles of all of its parent components and its own.
+	/// Clears this style, resetting all of its fields to [None]. When in the context of a tree,
+	/// this indicates that a node will inherit all of its values from its parent.
 	///
 	/// # Examples
 	/// ```
@@ -83,43 +542,16 @@ impl Style {
 	/// #
 	/// let mut style = Style {
 	///     bold: Some(true),
-	///     underlined: Some(true),
+	///     italic: Some(false),
 	///     ..Default::default()
 	/// };
 	///
-	/// style.merge(&Style {
-	///     bold: Some(false),
-	///     italic: Some(true),
-	///     ..Default::default()
-	/// });
-	///
-	/// assert_eq!(style.bold, Some(false));
-	/// assert_eq!(style.italic, Some(true));
-	/// assert_eq!(style.underlined, Some(true));
+	/// style.clear();
+	/// assert_eq!(style.bold, None);
+	/// assert_eq!(style.italic, None);
 	/// ```
-	pub fn merge(&mut self, other: &Self) {
-		self.bold = other.bold.or(self.bold);
-		self.italic = other.italic.or(self.italic);
-		self.underlined = other.underlined.or(self.underlined);
-		self.strikethrough = other.strikethrough.or(self.strikethrough);
-		self.obfuscated = other.obfuscated.or(self.obfuscated);
-		self.font = other.font.as_ref().or(self.font.as_ref()).cloned();
-		self.color = other.color.or(self.color);
-		self.insertion = other
-			.insertion
-			.as_ref()
-			.or(self.insertion.as_ref())
-			.cloned();
-		self.click_event = other
-			.click_event
-			.as_ref()
-			.or(self.click_event.as_ref())
-			.cloned();
-		self.hover_event = other
-			.hover_event
-			.as_ref()
-			.or(self.hover_event.as_ref())
-			.cloned();
+	pub fn clear(&mut self) {
+		mem::swap(self, &mut Default::default());
 	}
 }
 
