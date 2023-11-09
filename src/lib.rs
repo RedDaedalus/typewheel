@@ -1,7 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(ci, deny(missing_docs))]
 #![cfg_attr(not(ci), warn(missing_docs))]
-#![cfg_attr(ci, warn(todo))]
+#![cfg_attr(ci), warn(clippy::todo)]
 // #![feature(impl_trait_in_assoc_type)] // TODO: use this feature for iterators to seal the type
 
 pub mod codec;
