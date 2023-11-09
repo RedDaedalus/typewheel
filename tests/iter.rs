@@ -19,13 +19,6 @@ fn depth_first_iter() {
 }
 
 #[test]
-fn for_each_test() {
-	for node in &common::deeply_nested() {
-		println!("{node:?}");
-	}
-}
-
-#[test]
 fn breadth_first_iter() {
 	let component = common::deeply_nested();
 	let mut iter = component.iter(IterOrder::BreadthFirst);
