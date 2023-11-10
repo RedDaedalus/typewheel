@@ -6,7 +6,9 @@
 
 pub mod codec;
 mod event;
+mod flatten;
 mod iter;
+mod serial;
 mod style;
 
 #[doc(hidden)]
@@ -16,7 +18,6 @@ pub use self::{
 	iter::IterOrder,
 	style::{Style, TextColor},
 };
-
 use std::fmt::{Display, Formatter};
 
 use serde::{Deserialize, Serialize};
@@ -39,23 +40,41 @@ use std::mem;
 /// The `selector` and `nbt` component types are both unsupported. This is because they cannot be
 /// rendered by the client, and have to instead be replaced with [text][ComponentBody::Text]
 /// components.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Component {
 	/// This component's style. The style contains common properties to how a component is rendered,
 	/// including font, color, and event behavior.
-	#[serde(flatten)]
 	pub style: Style,
 
 	/// The component's body. The body holds the actual content of this component that varies based
 	/// on its type.
-	#[serde(flatten)]
 	// NOTE: Ideally this would be before `style`, but the order matters for serde
 	pub body: ComponentBody,
 
 	/// The component's children. When being written out, components are read depth-first.
-	#[serde(skip_serializing_if = "Vec::is_empty", default)]
 	pub extra: Vec<Component>,
+}
+
+#[test]
+fn serialize() {
+	println!(
+		"{:?}",
+		serde_json::to_string(&Component::text("hello world"))
+	);
+	println!(
+		"{:?}",
+		serde_json::to_string(&Component::text("hey").with_bold(true))
+	)
+}
+
+#[test]
+fn deserialize() {
+	println!("{:?}", serde_json::from_str::<Component>("\"hello world\""));
+	println!(
+		"{:?}",
+		serde_json::from_str::<Component>("{\"text\":\"hello world\",\"bold\":true}")
+	)
 }
 
 impl Component {
@@ -241,6 +260,17 @@ impl From<String> for Component {
 impl From<&str> for Component {
 	fn from(value: &str) -> Self {
 		Self::text(value.to_string())
+	}
+}
+
+impl TryInto<String> for Component {
+	type Error = Self;
+
+	fn try_into(self) -> Result<String, Self::Error> {
+		match self.body {
+			ComponentBody::Text(text) => Ok(text),
+			_ => Err(self),
+		}
 	}
 }
 

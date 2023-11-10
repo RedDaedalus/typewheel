@@ -77,6 +77,7 @@ mod json {
 	/// let codec = JsonComponentCodec;
 	/// assert_eq!(codec.serialize(&component).unwrap(), JSON);
 	/// assert_eq!(codec.deserialize(JSON).unwrap(), component);
+	/// assert_eq!(codec.deserialize("\"hello world\"").unwrap(), Component::text("hello world"));
 	/// ```
 	#[derive(Clone, Copy)] // Clone has no meaning here but Copy does
 	pub struct JsonComponentCodec;
