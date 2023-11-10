@@ -1,5 +1,5 @@
 use serde_test::{assert_tokens, Token};
-use typewheel::TextColor;
+use typewheel::{Component, TextColor};
 
 mod common;
 
@@ -48,6 +48,28 @@ fn general_serial() {
 			// ..end
 			Token::MapEnd,
 			Token::SeqEnd,
+			Token::MapEnd,
+		],
+	);
+}
+
+#[test]
+fn compacting_tokens() {
+	assert_tokens(
+		&Component::text("hello world"),
+		&[Token::String("hello world")],
+	);
+
+	// Ensure that a styled component isn't compacted
+	assert_tokens(
+		&Component::text("hello bold").with_bold(true),
+		&[
+			Token::Map { len: None },
+			Token::String("bold"),
+			Token::Some,
+			Token::Bool(true),
+			Token::String("text"),
+			Token::String("hello bold"),
 			Token::MapEnd,
 		],
 	);

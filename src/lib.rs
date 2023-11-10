@@ -40,7 +40,8 @@ use std::mem;
 /// The `selector` and `nbt` component types are both unsupported. This is because they cannot be
 /// rendered by the client, and have to instead be replaced with [text][ComponentBody::Text]
 /// components.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(from = "serial::SerialVessel", into = "serial::SerialVessel")]
 #[non_exhaustive]
 pub struct Component {
 	/// This component's style. The style contains common properties to how a component is rendered,
@@ -54,27 +55,6 @@ pub struct Component {
 
 	/// The component's children. When being written out, components are read depth-first.
 	pub extra: Vec<Component>,
-}
-
-#[test]
-fn serialize() {
-	println!(
-		"{:?}",
-		serde_json::to_string(&Component::text("hello world"))
-	);
-	println!(
-		"{:?}",
-		serde_json::to_string(&Component::text("hey").with_bold(true))
-	)
-}
-
-#[test]
-fn deserialize() {
-	println!("{:?}", serde_json::from_str::<Component>("\"hello world\""));
-	println!(
-		"{:?}",
-		serde_json::from_str::<Component>("{\"text\":\"hello world\",\"bold\":true}")
-	)
 }
 
 impl Component {
