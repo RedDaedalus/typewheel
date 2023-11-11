@@ -55,6 +55,9 @@ mod json {
 	/// A component codec for serializing components to and from their JSON representation. This is
 	/// locked behind the `json` crate feature.
 	///
+	/// Text components with no styling can be represented as strings. For example, `"hello world"`
+	/// is deserialized into the equivalent of `Component::text("hello world")`.  
+	///
 	/// This codec uses [serde_json] to serialize and deserialize components using the derived
 	/// component serializer.
 	///
@@ -78,6 +81,7 @@ mod json {
 	/// assert_eq!(codec.serialize(&component).unwrap(), JSON);
 	/// assert_eq!(codec.deserialize(JSON).unwrap(), component);
 	/// assert_eq!(codec.deserialize("\"hello world\"").unwrap(), Component::text("hello world"));
+	/// assert_eq!(codec.serialize(&Component::text("hello world")).unwrap(), "\"hello world\"");
 	/// ```
 	#[derive(Clone, Copy)] // Clone has no meaning here but Copy does
 	pub struct JsonComponentCodec;

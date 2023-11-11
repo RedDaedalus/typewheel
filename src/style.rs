@@ -84,9 +84,10 @@ macro_rules! style_fields {
 				$(self.$field.is_none() )&&+
 			}
 
-			/// Merges two styles together, with the style parameter taking precedence over `self`. This is
-			/// designed to mimic the way styles are inherited when rendering a component; a node's effective
-			/// style is the result of merging the styles of all of its parent components and its own.
+			/// Merges two styles together, with the style parameter taking precedence over `self`.
+			/// This is designed to mimic the way styles are inherited when rendering a component;
+			/// a node's effective style is the result of merging the styles of all of its parent
+			/// components and its own.
 			///
 			/// # Examples
 			/// ```

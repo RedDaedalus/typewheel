@@ -6,13 +6,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde = { version = "1.0.190", features = ["derive"] }
+serde = { version = "1.0.192", features = ["derive"] }
 serde_json = { version = "1.0.108", optional = true }
+quartz_nbt = { version = "^0.2.8", features = ["serde"], optional = true }
+uuid = { version = "1.5.0", features = ["serde"] }
 
 [features]
-default = ["json"]
+default = ["json", "nbt"]
 experimental_hover_events = []
 json = ["dep:serde_json"]
+nbt = ["dep:quartz_nbt"]
 
 [dev-dependencies]
 serde_test = "1.0.176"

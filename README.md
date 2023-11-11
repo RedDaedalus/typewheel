@@ -1,3 +1,5 @@
+# Welcome to Typewheel
+
 Typewheel is a library for creating and serializing Minecraft [text components][wiki]. This
 project is loosely inspired by the [Adventure project][adventure].
 
@@ -31,7 +33,7 @@ Components can be serialized and deserialized using codecs. The most commonly us
 encoding components is JSON, which is implemented with the `codec::JsonComponentCodec` struct.
 Other serializers exist for a variety of formats and implementations.
 
-# Create Features
+# Crate Features
 * `json`: Enables the use of `codec::JsonComponentCodec` via `serde_json`.
 * `experimental_hover_events`: Enables the use of the unfinished `show_item` and `show_entity` hover events.
 
