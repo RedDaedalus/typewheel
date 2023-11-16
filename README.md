@@ -35,7 +35,7 @@ Other serializers exist for a variety of formats and implementations.
 
 # Crate Features
 * `json`: Enables the use of `codec::JsonComponentCodec` via `serde_json`.
-* `experimental_hover_events`: Enables the use of the unfinished `show_item` and `show_entity` hover events.
+* `nbt`: Enables setting NBT tags in item hovers.
 
 [wiki]: https://wiki.vg/Chat
 [adventure]: https://docs.advntr.dev

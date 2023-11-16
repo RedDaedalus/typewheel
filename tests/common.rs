@@ -1,5 +1,6 @@
 #![allow(unused)] // Rust doesn't consider items used if only referenced in tests
 
+use typewheel::codec::ComponentCodec;
 use typewheel::{Component, TextColor};
 
 /// A common component reusable by multiple tests. Returns a deeply-nested component with the

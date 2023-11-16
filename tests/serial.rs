@@ -1,5 +1,5 @@
 use serde_test::{assert_tokens, Token};
-use typewheel::{Component, TextColor};
+use typewheel::{Component, ItemHover, TextColor};
 
 mod common;
 
@@ -23,7 +23,7 @@ fn general_serial() {
 				name: "TextColor",
 				variant: "green",
 			},
-			// body.text
+			// content.text
 			Token::String("text"),
 			Token::String("hello "),
 			// extra
@@ -42,7 +42,7 @@ fn general_serial() {
 				name: "TextColor",
 				variant: "blue",
 			},
-			// extra[0].body.text
+			// extra[0].content.text
 			Token::String("text"),
 			Token::String("world"),
 			// ..end
@@ -86,4 +86,37 @@ fn color_tokens() {
 	);
 	assert_tokens(&TextColor::Hex(0x000123), &[Token::String("#000123")]);
 	assert!(serde_json::to_string(&TextColor::Hex(u32::MAX)).is_err());
+}
+
+#[test]
+#[cfg(feature = "nbt")]
+fn event_tokens() {
+	use quartz_nbt::compound;
+	let item_hover = ItemHover::with_tag(
+		"minecraft:stone",
+		1,
+		compound! {
+			"display": {
+				"name": "hello world"
+			}
+		},
+	);
+
+	assert_tokens(
+		&item_hover,
+		&[
+			Token::Struct {
+				name: "ItemHover",
+				len: 3,
+			},
+			Token::String("id"),
+			Token::String("minecraft:stone"),
+			Token::String("count"),
+			Token::I32(1),
+			Token::String("tag"),
+			Token::Some,
+			Token::String(r#"{display:{name:hello world}}"#),
+			Token::StructEnd,
+		],
+	);
 }

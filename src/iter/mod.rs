@@ -1,5 +1,5 @@
-use crate::Component;
-use std::collections::VecDeque;
+mod tree;
+// mod visit;
 
 /// Determines the order over which a component iterator runs through child components.
 ///
@@ -13,8 +13,8 @@ use std::collections::VecDeque;
 /// #
 /// let component = Component::text("a").with_extra(["b", "c"]);
 ///
-/// for child in component.iter(Default::default()) {
-///     println!("{}", child.shallow_content().unwrap_or(""));
+/// for child in component.iter(Default::default(), ) {
+///     println!("{}", child.shallow_text().unwrap_or(""));
 /// }
 /// ```
 #[derive(Default)]
@@ -77,73 +77,4 @@ pub enum IterOrder {
 	/// 7. g
 	/// 8. h
 	BreadthFirst,
-}
-
-/// An internal iterator type. Eventually, this will not be exposed to the public API at all, and
-/// should not be used directly. (waiting on `impl_trait_in_assoc_type` to actually implement this)
-#[doc(hidden)]
-pub struct ComponentIterator<'a> {
-	queue: VecDeque<&'a Component>,
-	order: IterOrder,
-}
-
-impl<'a> Iterator for ComponentIterator<'a> {
-	type Item = &'a Component;
-
-	fn next(&mut self) -> Option<Self::Item> {
-		if let Some(item) = self.queue.pop_front() {
-			match self.order {
-				IterOrder::DepthFirst => {
-					for child in item.extra.iter().rev() {
-						self.queue.push_front(child);
-					}
-				}
-
-				IterOrder::BreadthFirst => {
-					for child in &item.extra {
-						self.queue.push_back(child);
-					}
-				}
-			}
-
-			Some(item)
-		} else {
-			None
-		}
-	}
-}
-
-impl Component {
-	/// Creates an iterator of [component references][Component]. Components are traversed in the
-	/// provided order.
-	///
-	/// # Usage
-	/// Normally, iterating over components can be done with a for-in loop. This uses the default
-	/// [IterOrder::DepthFirst] ordering:
-	/// ```rust,no_run
-	/// # use typewheel::Component;
-	/// #
-	/// let component = Component::text("a").with_extra(["b", "c"]);
-	/// for node in &component {
-	///     println!("{component:?}");
-	/// }
-	/// ```
-	pub fn iter(&self, order: IterOrder) -> impl Iterator<Item = &Self> {
-		ComponentIterator {
-			queue: VecDeque::from([self]),
-			order,
-		}
-	}
-}
-
-impl<'a> IntoIterator for &'a Component {
-	type Item = Self;
-	type IntoIter = ComponentIterator<'a>; // TODO: impl Iterator<Item = Self::Item>
-
-	fn into_iter(self) -> Self::IntoIter {
-		ComponentIterator {
-			queue: VecDeque::from([self]),
-			order: IterOrder::default(),
-		}
-	}
 }

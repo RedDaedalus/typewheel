@@ -165,7 +165,7 @@ impl From<Key> for (String, String) {
 		(
 			value
 				.0
-				.unwrap_or_else(|| Key::MINECRAFT_NAMESPACE.to_string()),
+				.unwrap_or_else(|| Key::MINECRAFT_NAMESPACE.to_owned()),
 			value.1,
 		)
 	}
@@ -179,6 +179,12 @@ impl From<String> for Key {
 		} else {
 			Self::minecraft(value)
 		}
+	}
+}
+
+impl From<&str> for Key {
+	fn from(value: &str) -> Self {
+		value.to_string().into()
 	}
 }
 

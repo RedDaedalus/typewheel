@@ -13,7 +13,6 @@ uuid = { version = "1.5.0", features = ["serde"] }
 
 [features]
 default = ["json", "nbt"]
-experimental_hover_events = []
 json = ["dep:serde_json"]
 nbt = ["dep:quartz_nbt"]
 

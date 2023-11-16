@@ -47,7 +47,7 @@ macro_rules! style_fields {
 
 		$(
 			$(#[$field_meta: meta])*
-			$field: ident < $ty: ty > {
+			$field: ident< $ty: ty > {
 				$(#[$set_meta: meta])*
 				set: $setter: ident,
 				$(#[$build_meta: meta])*
@@ -59,7 +59,7 @@ macro_rules! style_fields {
 	) => {
 		$(#[$struct_meta])*
 		// "intrinsic" traits -- expected to exist by this macro.
-		#[derive(serde::Serialize, serde::Deserialize, Default, Clone)]
+		#[derive(serde::Serialize, serde::Deserialize, Clone)]
 		$vis struct $name {
 			$(
 				#[serde(skip_serializing_if = "Option::is_none")]
@@ -69,6 +69,22 @@ macro_rules! style_fields {
 		}
 
 		impl $name {
+			/// A blank style. All of this style's fields are set to [None]. This is the [default]
+			/// [Default::default()] style.
+			pub const BLANK: Self = Self {
+				$($field: None),+
+			};
+
+			$(
+			#[allow(dead_code)]
+			pub(crate) fn $field(state: impl Into<$ty>) -> Self {
+				Self {
+					$field: Some(state.into()),
+					..Default::default()
+				}
+			}
+			)+
+
 			/// Checks if this style is blank, or in other words, that all of its fields are [None].
 			///
 			/// # Examples
@@ -108,13 +124,20 @@ macro_rules! style_fields {
 			/// assert_eq!(style.bold, Some(false));
 			/// assert_eq!(style.italic, Some(true));
 			/// assert_eq!(style.underlined, Some(true));
-			///
+			/// ```
 			pub fn merge(&mut self, src: &Self) {
 				$(
 					if let Some(v) = &src.$field {
 						self.$field = Some(v.clone());
 					}
 				)+
+			}
+		}
+
+		impl std::default::Default for $name {
+			#[inline]
+			fn default() -> Self {
+				Self::BLANK
 			}
 		}
 
@@ -636,6 +659,56 @@ pub enum TextColor {
 	/// yield an error.
 	#[serde(untagged, with = "hex_serde")]
 	Hex(u32),
+}
+
+impl TextColor {
+	pub(crate) const fn color_code(&self) -> char {
+		match self {
+			TextColor::Black => '0',
+			TextColor::DarkBlue => '1',
+			TextColor::DarkGreen => '2',
+			TextColor::DarkAqua => '3',
+			TextColor::DarkRed => '4',
+			TextColor::DarkPurple => '5',
+			TextColor::Gold => '6',
+			TextColor::Gray => '7',
+			TextColor::DarkGray => '8',
+			TextColor::Blue => '9',
+			TextColor::Green => 'a',
+			TextColor::Aqua => 'b',
+			TextColor::Red => 'c',
+			TextColor::LightPurple => 'd',
+			TextColor::Yellow => 'e',
+			TextColor::White => 'f',
+			TextColor::Hex(_) => '\0',
+		}
+	}
+
+	pub(crate) fn from_color_code(code: char) -> Option<Self> {
+		let color = match code {
+			'0' => TextColor::Black,
+			'1' => TextColor::DarkBlue,
+			'2' => TextColor::DarkGreen,
+			'3' => TextColor::DarkAqua,
+			'4' => TextColor::DarkRed,
+			'5' => TextColor::DarkPurple,
+			'6' => TextColor::Gold,
+			'7' => TextColor::Gray,
+			'8' => TextColor::DarkGray,
+			'9' => TextColor::Blue,
+			'a' => TextColor::Green,
+			'b' => TextColor::Aqua,
+			'c' => TextColor::Red,
+			'd' => TextColor::LightPurple,
+			'e' => TextColor::Yellow,
+			'f' => TextColor::White,
+			_ => {
+				return None;
+			}
+		};
+
+		Some(color)
+	}
 }
 
 impl From<u32> for TextColor {
