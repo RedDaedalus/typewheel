@@ -161,7 +161,7 @@ impl Component {
 	///
 	/// component.append([extra.clone()]);
 	///
-	/// assert_eq!(component.extra().first(), Some(&extra));
+	/// assert_eq!(component.extra.first(), Some(&extra));
 	/// ```
 	pub fn append(&mut self, extra: impl IntoIterator<Item = impl Into<Component>>) {
 		self.extra.extend(extra.into_iter().map(Into::into));
@@ -181,7 +181,7 @@ impl Component {
 	///     .with_color(TextColor::Gray)
 	///     .with_extra([extra.clone()]);
 	///
-	/// assert_eq!(component.extra().first(), Some(&extra));
+	/// assert_eq!(component.extra.first(), Some(&extra));
 	/// ```
 	#[must_use]
 	#[inline]
@@ -199,7 +199,7 @@ impl Component {
 	///     .with_extra(["world"]);
 	///
 	/// component.clear_extra();
-	/// assert!(component.extra().is_empty());
+	/// assert!(component.extra.is_empty());
 	/// ```
 	pub fn clear_extra(&mut self) {
 		self.extra.clear();

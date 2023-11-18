@@ -15,8 +15,8 @@ use std::collections::VecDeque;
 /// ```
 /// # use typewheel::{Component, iter::Visit};
 /// let component = Component::text("A")
-///     .with_extra(Component::text("B")
-///         .with_extra(Component::text("C")));
+///     .with_extra([Component::text("B")
+///         .with_extra([Component::text("C")])]);
 ///
 /// let mut depth = 0;
 /// for op in component.visit() {
@@ -71,10 +71,8 @@ impl<'a> Iterator for VisitingIterator<'a> {
 pub enum Visit<'a> {
 	/// Indicates that a component has entered the context of a [VisitingIterator]. After all of its
 	/// children have been consumed, a [Self::Pop] value is emitted.
-	#[non_exhaustive]
 	Push(&'a Component),
 
 	/// Indicates that a component and all of its children have been consumed by a [VisitingIterator].
-	#[non_exhaustive]
 	Pop(&'a Component),
 }

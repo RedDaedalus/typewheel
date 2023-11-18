@@ -21,7 +21,7 @@
 //!     .with_extra([inner, "!".into()]);
 //!
 //! assert_eq!(component.style.color, Some(TextColor::Gray));
-//! assert!(!component.extra().is_empty());
+//! assert!(!component.extra.is_empty());
 //! ```
 //!
 //! # Serializing Components
