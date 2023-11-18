@@ -1,30 +1,79 @@
-use crate::{Component, Content, IterOrder};
+use super::IterOrder;
+use crate::{Component, Content};
+use std::cmp::max;
 use std::collections::VecDeque;
 
-pub struct TreeIterator<'a> {
+/// A variable-order iterator over [Component] trees. This iterator does *not* preserve information
+/// about the "shape" of the component tree. For a more structured iterator, use a [visiting
+/// iterator][visit].
+///
+/// [visit]: crate::iter::VisitingIterator;
+#[must_use]
+pub struct FlatIterator<'a> {
 	queue: VecDeque<&'a Component>,
 	order: IterOrder,
 	include_translate_args: bool,
+
+	/// A lower bound for the iterator size hint. This is a conservative estimate and does not
+	/// represent the true size of the iterator. Default is extra.len().
+	size_hint: usize,
 }
 
-impl TreeIterator<'_> {
+impl<'a> FlatIterator<'a> {
+	#[inline]
+	pub(super) fn new(root: &'a Component) -> Self {
+		Self {
+			queue: VecDeque::from([root]),
+			order: IterOrder::default(),
+			include_translate_args: false,
+			size_hint: root.extra.len(),
+		}
+	}
+}
+
+impl FlatIterator<'_> {
+	/// Sets a flag to include [translation arguments][crate::Content::Translation] in the output
+	/// of this iterator.
+	///
+	/// # Examples
+	/// ```
+	/// use typewheel::Component;
+	///
+	/// let user_arg = "user";
+	/// let task_arg = "task";
+	/// let component = Component::translate("chat.type.advancement.task", [user_arg, task_arg]);
+	///
+	/// let mut iter = component.iter().with_translate_args();
+	/// assert_eq!(iter.next(), Some(&component));
+	/// assert_eq!(iter.next(), Some(&Component::text(user_arg)));
+	/// assert_eq!(iter.next(), Some(&Component::text(task_arg)));
+	/// assert_eq!(iter.next(), None);
+	/// ```
 	pub fn with_translate_args(mut self) -> Self {
 		self.include_translate_args = true;
 		self
 	}
+
+	/// Sets the [iteration order][IterOrder] for this iterator. See the [IterOrder] docs for more
+	/// information.
+	pub fn with_order(mut self, order: IterOrder) -> Self {
+		self.order = order;
+		self
+	}
 }
 
-impl<'a> Iterator for TreeIterator<'a> {
+impl<'a> Iterator for FlatIterator<'a> {
 	type Item = &'a Component;
 
 	fn next(&mut self) -> Option<Self::Item> {
-		if let Some(item) = self.queue.pop_front() {
-			let extra = item.extra();
+		let next = self.queue.pop_front();
+		if let Some(item) = next {
+			let extra = &item.extra;
 
 			match self.order {
 				IterOrder::BreadthFirst => {
 					if self.include_translate_args
-						&& let Content::Translation { with: args, .. } = item.content()
+						&& let Content::Translation { with: args, .. } = &item.content
 					{
 						// Reserve room for args and extra all at once.
 						self.queue.reserve(args.len() + extra.len());
@@ -36,7 +85,7 @@ impl<'a> Iterator for TreeIterator<'a> {
 
 				IterOrder::DepthFirst => {
 					if self.include_translate_args
-						&& let Content::Translation { with: args, .. } = item.content()
+						&& let Content::Translation { with: args, .. } = &item.content
 					{
 						self.queue.reserve(args.len() + extra.len());
 
@@ -54,11 +103,9 @@ impl<'a> Iterator for TreeIterator<'a> {
 					}
 				}
 			}
-
-			Some(item)
-		} else {
-			None
 		}
+
+		next
 	}
 
 	fn size_hint(&self) -> (usize, Option<usize>) {
@@ -66,41 +113,17 @@ impl<'a> Iterator for TreeIterator<'a> {
 		// deserialized much more often than they are iterated, so the cost of traveling the tree
 		// again after serialization doesn't make sense.
 
-		// TODO: Consider using a custom JSON deserializer to compute the proper size at parse time
-		(self.queue.len(), None)
-	}
-}
-
-impl Component {
-	/// Creates an iterator of [component references][Component]. Components are traversed in the
-	/// provided order.
-	///
-	/// # Usage
-	/// Normally, iterating over components can be done with a for-in loop. This uses the default
-	/// [IterOrder::DepthFirst] ordering:
-	/// ```rust,no_run
-	/// # use typewheel::Component;
-	/// #
-	/// let component = Component::text("a").with_extra(["b", "c"]);
-	/// for node in &component {
-	///     println!("{component:?}");
-	/// }
-	/// ```
-	pub fn iter(&self, order: IterOrder) -> TreeIterator {
-		TreeIterator {
-			queue: VecDeque::from([self]),
-			order,
-			include_translate_args: false,
-		}
+		// Consider using a custom JSON deserializer to compute the proper size at parse time
+		(max(self.size_hint, self.queue.len()), None)
 	}
 }
 
 impl<'a> IntoIterator for &'a Component {
 	type Item = &'a Component;
-	type IntoIter = TreeIterator<'a>;
+	type IntoIter = FlatIterator<'a>;
 
 	#[inline(always)]
 	fn into_iter(self) -> Self::IntoIter {
-		self.iter(IterOrder::default())
+		self.iter()
 	}
 }

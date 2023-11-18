@@ -18,12 +18,12 @@
 
 #[cfg(any(feature = "json", doc))]
 mod json;
-// mod legacy;
+mod legacy;
 mod plain;
 
 #[cfg(any(feature = "json", doc))]
-pub use self::{json::JsonCodec, plain::PlainTextCodec};
-// pub use self::{legacy::LegacyCodec, plain::PlainTextCodec};
+pub use self::json::JsonCodec;
+pub use self::{legacy::LegacyCodec, plain::PlainTextCodec};
 
 use crate::Component;
 
@@ -51,8 +51,10 @@ where
 	type DecodeOutput;
 
 	/// Serializes a component, returning its encoded representation as [Self::EncodeOutput].
+	#[must_use]
 	fn serialize(self, component: &Component) -> Self::EncodeOutput;
 
 	/// Deserializes a component from an arbitrary [input representation][Self::Input].
+	#[must_use]
 	fn deserialize(self, value: impl Into<Self::DecodeInput>) -> Self::DecodeOutput;
 }

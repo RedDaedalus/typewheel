@@ -76,8 +76,9 @@ macro_rules! style_fields {
 			};
 
 			$(
-			#[allow(dead_code)]
-			pub(crate) fn $field(state: impl Into<$ty>) -> Self {
+			#[doc = concat!("Creates a new style with only the `", stringify!($field), "` field set.")]
+			/// All other fields are initialized to [None].
+			pub fn $field(state: impl Into<$ty>) -> Self {
 				Self {
 					$field: Some(state.into()),
 					..Default::default()

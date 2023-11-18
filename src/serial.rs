@@ -40,7 +40,7 @@ impl From<Component> for SerialVessel {
 	#[inline(always)]
 	fn from(value: Component) -> Self {
 		// Compacting: encode this component as a raw string if possible.
-		if value.extra().is_empty() && value.style.is_blank() {
+		if value.extra.is_empty() && value.style.is_blank() {
 			if let Content::Text(text) = value.content {
 				return Self::Plain(text);
 			}

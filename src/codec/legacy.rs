@@ -1,5 +1,5 @@
 use crate::codec::ComponentCodec;
-use crate::{Component, Content, Style, Visit};
+use crate::{iter::Visit, Component, Content, Style};
 use std::collections::VecDeque;
 
 #[allow(unused_imports)]
@@ -13,24 +13,24 @@ use crate::TextColor;
 /// non-hex colors and the format attributes (bold, italic, underlined, strikethrough, obfuscated).
 ///
 /// ## Color Codes
-/// | Code | Value                    |
-/// | ---- | ------------------------ |
-/// | `§0` | [TextColor::Black]       |
-/// | `§1` | [TextColor::DarkBlue]    |
-/// | `§2` | [TextColor::DarkGreen]   |
-/// | `§3` | [TextColor::DarkAqua]    |
-/// | `§4` | [TextColor::DarkRed]     |
-/// | `§5` | [TextColor::DarkPurple]  |
-/// | `§6` | [TextColor::Gold]        |
-/// | `§7` | [TextColor::Gray]        |
-/// | `§8` | [TextColor::DarkGray]    |
-/// | `§9` | [TextColor::Blue]        |
-/// | `§a` | [TextColor::Green]       |
-/// | `§b` | [TextColor::Aqua]        |
-/// | `§c` | [TextColor::Red]         |
-/// | `§d` | [TextColor::LightPurple] |
-/// | `§e` | [TextColor::Yellow]      |
-/// | `§f` | [TextColor::White]       |
+/// | Code | Value                              |
+/// | ---- | ---------------------------------- |
+/// | `§0` | [TextColor::Black]                 |
+/// | `§1` | [TextColor::DarkBlue]              |
+/// | `§2` | [TextColor::DarkGreen]             |
+/// | `§3` | [TextColor::DarkAqua]              |
+/// | `§4` | [TextColor::DarkRed]               |
+/// | `§5` | [TextColor::DarkPurple]            |
+/// | `§6` | [TextColor::Gold]                  |
+/// | `§7` | [TextColor::Gray]                  |
+/// | `§8` | [TextColor::DarkGray]              |
+/// | `§9` | [TextColor::Blue]                  |
+/// | `§a` | [TextColor::Green]                 |
+/// | `§b` | [TextColor::Aqua]                  |
+/// | `§c` | [TextColor::Red]                   |
+/// | `§d` | [TextColor::LightPurple]           |
+/// | `§e` | [TextColor::Yellow]                |
+/// | `§f` | [TextColor::White]                 |
 ///
 /// ## Style Codes
 /// | Code | Style Field                        |
@@ -43,15 +43,33 @@ use crate::TextColor;
 /// | `§r` | [Style::clear] (resets all styles) |
 ///
 /// This table uses the section symbol (`§`) as this is the character used by Minecraft. This codec
-/// can be configured to use any symbol, however, by providing a character in the generic:
+/// supports both the section symbol and ampersand (`&`) for the color code indicator. The different
+/// variations can be accessed via the [LegacyCodec::SECTION] and [LegacyCodec::AMPERSAND] constants.
+/// Additionally, to use a custom character, the `S` generic parameter may be specified:
+///
 /// ```
 /// # use typewheel::{Component, codec::{ComponentCodec, LegacyCodec}};
 /// #
-/// let ampersand_codec = LegacyCodec::<'&'>;
-/// assert_eq!(ampersand_codec.serialize(&Component::text("hello").with_bold(true)), "&lhello");
+/// let component = Component::text("hello").with_bold(true);
+///
+/// let ampersand_codec = LegacyCodec::AMPERSAND;
+/// assert_eq!(ampersand_codec.serialize(&component), "&lhello");
+///
+/// let dollar_codec = LegacyCodec::<'$'>;
+/// assert_eq!(dollar_codec.serialize(&component), "$lhello");
 /// ```
 #[derive(Clone, Copy)]
-pub struct LegacyCodec<const S: char = '§'>;
+pub struct LegacyCodec<const S: char>;
+
+impl LegacyCodec<'§'> {
+	/// A [LegacyCodec] instance that uses the section symbol (`§`) as the control character.
+	pub const SECTION: Self = Self;
+}
+
+impl LegacyCodec<'&'> {
+	/// A [LegacyCodec] instance that uses the ampersand symbol (`&`) as the control character.
+	pub const AMPERSAND: Self = Self;
+}
 
 impl<const S: char> ComponentCodec for LegacyCodec<S> {
 	type DecodeInput = String;
@@ -83,7 +101,7 @@ impl<const S: char> ComponentCodec for LegacyCodec<S> {
 
 					apply_format_styles::<S>(&mut out, &to_apply);
 
-					if let Some(content) = node.shallow_content() {
+					if let Some(content) = node.shallow_text() {
 						out += content;
 					}
 				}
@@ -108,7 +126,12 @@ impl<const S: char> ComponentCodec for LegacyCodec<S> {
 				let code = segment.chars().next()?;
 
 				if let Some(color) = TextColor::from_color_code(code) {
-					return Some((Style::color(color), &segment[1..]));
+					// Color codes reset all other fields.
+					let style = Style {
+						color: Some(color),
+						..RESETTING
+					};
+					return Some((style, &segment[1..]));
 				}
 
 				let style = match code {
@@ -180,5 +203,22 @@ fn apply_format_styles<const S: char>(target: &mut String, style: &Style) {
 
 	if let Some(true) = style.obfuscated {
 		target.extend([S, OBFUSCATED]);
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::codec::{ComponentCodec, LegacyCodec};
+	use crate::{Component, TextColor};
+
+	#[test]
+	fn encode_color_codes() {
+		let component = Component::text("hello ")
+			.with_bold(true)
+			.with_color(TextColor::Green)
+			.with_extra([Component::text("world").with_color(TextColor::Blue)]);
+
+		let codec = LegacyCodec::SECTION;
+		assert_eq!(codec.serialize(&component), "§a§lhello §9§lworld");
 	}
 }

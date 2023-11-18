@@ -24,14 +24,18 @@ use crate::{serial, Content, Style};
 #[non_exhaustive]
 pub struct Component {
 	/// The component's content, containing the values that are actually outputted to the user.
-	pub(crate) content: Content,
+	pub content: Content,
 
 	/// This component's style. The style contains common properties to how a component is rendered,
 	/// including font, color, and event behavior.
 	pub style: Style,
 
-	// Private to prevent length desync
-	pub(crate) extra: Vec<Component>,
+	/// This component's children (or extra). When being rendered out, children are read from left
+	/// to right.
+	///
+	/// This field should generally not be modified directly. Instead, use the [Self::append()] and
+	/// [Self::clear_extra()] methods.
+	pub extra: Vec<Component>,
 }
 
 impl Component {
@@ -85,7 +89,10 @@ impl Component {
 	/// let component = Component::translate("key", None::<Component>);
 	/// ```
 	#[inline]
-	pub fn translate(key: impl Into<String>, with: impl IntoIterator<Item = Component>) -> Self {
+	pub fn translate(
+		key: impl Into<String>,
+		with: impl IntoIterator<Item = impl Into<Component>>,
+	) -> Self {
 		Self::new(Content::Translation {
 			key: key.into(),
 			with: with.into_iter().map(Into::into).collect(),
@@ -157,11 +164,7 @@ impl Component {
 	/// assert_eq!(component.extra().first(), Some(&extra));
 	/// ```
 	pub fn append(&mut self, extra: impl IntoIterator<Item = impl Into<Component>>) {
-		let extra_start = self.extra.len();
 		self.extra.extend(extra.into_iter().map(Into::into));
-
-		let slice = &self.extra[extra_start..];
-		println!("{slice:?}");
 	}
 
 	/// Similar to [Self::append], this method appends additional children to this component. This
@@ -229,29 +232,8 @@ impl Component {
 		0
 	}
 
-	/// Gets a reference to this component's direct children.
-	///
-	/// To add or remove extra components, use [Self::append()] and [Self::clear_extra()].
-	///
-	/// # Examples
-	/// ```
-	/// # use typewheel::Component;
-	/// #
-	/// let component = Component::text("a")
-	///     .with_extra(["b", "c"]);
-	///
-	/// assert_eq!(component.extra().len(), 2);
-	/// ```
-	pub fn extra(&self) -> &[Component] {
-		&self.extra
-	}
-
-	pub fn content(&self) -> &Content {
-		&self.content
-	}
-
 	/// Gets the text of this component, excluding that of its children. If its [content]
-	/// [Self::content()] is not [Content::Text], this method will return [None].
+	/// [Self::content] is not [Content::Text], this method will return [None].
 	///
 	/// To get the full contents of a component, use the [plain text codec][plain]. To render the
 	/// component content regardless of its type, use [Content::to_string].
@@ -295,6 +277,26 @@ impl Component {
 			content: first.content,
 			style,
 			extra: self.extra,
+		}
+	}
+}
+
+impl PartialEq<String> for Component {
+	fn eq(&self, other: &String) -> bool {
+		if let Some(text) = self.shallow_text() {
+			text == other
+		} else {
+			false
+		}
+	}
+}
+
+impl PartialEq<&str> for Component {
+	fn eq(&self, other: &&str) -> bool {
+		if let Some(text) = self.shallow_text() {
+			text == *other
+		} else {
+			false
 		}
 	}
 }

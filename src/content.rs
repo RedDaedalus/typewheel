@@ -77,7 +77,7 @@ impl Display for Content {
 			Self::Translation { key, with: args } => {
 				write!(f, "<{key}")?;
 				for arg in args {
-					write!(f, ":{}", arg.content())?;
+					write!(f, ":{}", arg.content)?;
 				}
 				write!(f, ">")?;
 			}

@@ -39,15 +39,13 @@
 #![cfg_attr(ci, deny(missing_docs))]
 #![cfg_attr(not(ci), warn(missing_docs))]
 #![cfg_attr(ci, warn(clippy::todo))]
-// This is used for iterators because they involve unnameable types.
-#![feature(impl_trait_in_assoc_type)]
 #![feature(let_chains)]
 
 pub mod codec;
 mod component;
 mod content;
 mod event;
-mod iter;
+pub mod iter;
 mod key;
 mod serial;
 mod style;
@@ -56,7 +54,6 @@ pub use self::{
 	component::Component,
 	content::Content,
 	event::{ClickEvent, EntityHover, HoverEvent, ItemHover},
-	iter::IterOrder,
 	key::Key,
 	style::{Style, TextColor},
 };
