@@ -32,7 +32,7 @@ use crate::Component;
 ///     println!("{}", child.shallow_text().unwrap_or(""));
 /// }
 /// ```
-#[derive(Default)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum IterOrder {
 	/// Depth-first iteration order. When used in an iterator, the tree is traversed by visiting

@@ -2,13 +2,15 @@ use super::IterOrder;
 use crate::{Component, Content};
 use std::cmp::max;
 use std::collections::VecDeque;
+use std::iter::FusedIterator;
 
 /// A variable-order iterator over [Component] trees. This iterator does *not* preserve information
 /// about the "shape" of the component tree. For a more structured iterator, use a [visiting
 /// iterator][visit].
 ///
 /// [visit]: crate::iter::VisitingIterator;
-#[must_use]
+#[derive(Clone, Debug)]
+#[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct FlatIterator<'a> {
 	queue: VecDeque<&'a Component>,
 	order: IterOrder,
@@ -117,6 +119,8 @@ impl<'a> Iterator for FlatIterator<'a> {
 		(max(self.size_hint, self.queue.len()), None)
 	}
 }
+
+impl FusedIterator for FlatIterator<'_> {}
 
 impl<'a> IntoIterator for &'a Component {
 	type Item = &'a Component;

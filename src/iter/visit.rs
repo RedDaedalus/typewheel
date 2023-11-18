@@ -1,6 +1,7 @@
 use crate::Component;
 use std::cmp::max;
 use std::collections::VecDeque;
+use std::iter::FusedIterator;
 
 /// An [Iterator] type that iterates over [Component]s while keeping awareness of their tree-like
 /// structure.
@@ -26,8 +27,9 @@ use std::collections::VecDeque;
 ///     }
 ///     assert!(depth <= 3);
 /// }
-/// ```  
-#[must_use]
+/// ```
+#[derive(Clone, Debug)]
+#[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct VisitingIterator<'a> {
 	queue: VecDeque<Visit<'a>>,
 	size_hint: usize,
@@ -67,7 +69,10 @@ impl<'a> Iterator for VisitingIterator<'a> {
 	}
 }
 
+impl FusedIterator for VisitingIterator<'_> {}
+
 /// Represents an operation in a [VisitingIterator]. See the iterator docs for more information.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Visit<'a> {
 	/// Indicates that a component has entered the context of a [VisitingIterator]. After all of its
 	/// children have been consumed, a [Self::Pop] value is emitted.
