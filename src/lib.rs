@@ -39,7 +39,6 @@
 #![cfg_attr(ci, deny(missing_docs))]
 #![cfg_attr(not(ci), warn(missing_docs))]
 #![cfg_attr(ci, warn(clippy::todo))]
-#![feature(let_chains)]
 
 pub mod codec;
 mod component;

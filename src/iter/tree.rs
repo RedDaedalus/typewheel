@@ -74,8 +74,8 @@ impl<'a> Iterator for FlatIterator<'a> {
 
 			match self.order {
 				IterOrder::BreadthFirst => {
-					if self.include_translate_args
-						&& let Content::Translation { with: args, .. } = &item.content
+					if let (true, Content::Translation { with: args, .. }) =
+						(self.include_translate_args, &item.content)
 					{
 						// Reserve room for args and extra all at once.
 						self.queue.reserve(args.len() + extra.len());
@@ -86,8 +86,8 @@ impl<'a> Iterator for FlatIterator<'a> {
 				}
 
 				IterOrder::DepthFirst => {
-					if self.include_translate_args
-						&& let Content::Translation { with: args, .. } = &item.content
+					if let (true, Content::Translation { with: args, .. }) =
+						(self.include_translate_args, &item.content)
 					{
 						self.queue.reserve(args.len() + extra.len());
 
